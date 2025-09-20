@@ -49,9 +49,14 @@ class SharedPtr {
             ref_count = new size_t(1);
         }
 
-        void swap();
+        void swap(SharedPtr& other) {
+            std::swap(ptr, other.ptr);
+            std::swap(ref_count, other.ref_count);
+        }
 
-        void get();
+        T* get() const {
+            return ptr;
+        }
 
         bool operator==(const SharedPtr& other) const {
             if (ptr == other.ptr) return true;
@@ -59,7 +64,8 @@ class SharedPtr {
         };
 
         bool operator!=(const SharedPtr& other) const {
-            return false;
+            if (ptr != other.ptr) return true;
+            else return false;
         };
         int getCount(){
             return *ref_count;
@@ -74,6 +80,7 @@ class Test {
 };
 
 int main() {
+    {
     SharedPtr<Test> sp1(new Test());
     sp1->show();
 
@@ -82,6 +89,28 @@ int main() {
     std::cout << sp2.getCount() << std::endl;
     sp2.reset(new Test());
     sp2->show();
-     std::cout << sp2.getCount() << std::endl;
-     std::cout << "sp1 == sp2: " << (sp1 == sp2) << std::endl;
+    std::cout << sp2.getCount() << std::endl;
+    std::cout << "sp1 == sp2: " << (sp1 == sp2) << std::endl;
+    std::cout << "Тест swap:" << std::endl;
+    SharedPtr<Test> sp3(new Test());
+    SharedPtr<Test> sp4(new Test());
+
+    std::cout << "Перед swap:" << std::endl;
+    std::cout << "sp3: "; sp3->show();
+    std::cout << sp3.get() << std::endl;
+    std::cout << "sp4: "; sp4->show();
+    std::cout << sp4.get() << std::endl;
+
+
+    sp3.swap(sp4);
+
+    std::cout << "После swap:" << std::endl;
+    std::cout << "sp3: "; sp3->show();
+    std::cout << sp3.get() << std::endl;
+    std::cout << "sp4: "; sp4->show();
+    std::cout << sp4.get() << std::endl;
+    } // Выход из области видимости, вызов деструкторов
+    std::cout << "Конец main()" << std::endl;
+
+    return 0;
 }
