@@ -72,6 +72,7 @@ class SharedPtr {
         }
 };
 
+/*
 class Test {
     public:
         Test() { std::cout << "Test объект создан" << std::endl; }
@@ -113,4 +114,4 @@ int main() {
     std::cout << "Конец main()" << std::endl;
 
     return 0;
-}
+}*/
