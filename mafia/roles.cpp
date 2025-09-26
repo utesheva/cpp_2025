@@ -1,7 +1,6 @@
 #include "Share_ptr.cpp"
 #include <cstdio>
-#include <iostream>
-#include <ostream>
+#include <map>
 #include <vector>
 #include<random>
 
@@ -25,7 +24,7 @@ class Player {
         Player(int val): id(val) {}
 
         virtual void act(std::vector<SharedPtr<Player>> players) = 0;
-        virtual void vote() = 0;
+        virtual SharedPtr<Player> vote(std::vector<SharedPtr<Player>> players) = 0;
 
         Role getRole() const {
             return role;
@@ -41,6 +40,10 @@ class Player {
 
         void kill() {
             alive = false;
+        }
+
+        void cure() {
+            alive = true;
         }
 
 };
@@ -71,11 +74,27 @@ class Mafia : public Player {
             victim -> kill();
         }
 
-        void vote() override {
+        SharedPtr<Player> vote(std::vector<SharedPtr<Player>> players) override {
+            SharedPtr<Player> victim = choose_victim(players);
+            return victim;
         }
 };
 
 class Citizen : public Player {
+    protected:
+        SharedPtr<Player> choose_random(std::vector<SharedPtr<Player>> players) {
+             std::vector<SharedPtr<Player>> possible;
+            for (SharedPtr<Player> p: players){
+                if (p->getId() != this->id) {
+                    possible.push_back(p);
+                }
+            }
+            std::random_device random_device;
+            std::mt19937 engine{random_device()};   
+            std::uniform_int_distribution<int> dist(0, possible.size() - 1);   
+            return possible[dist(engine)];
+        }
+
     public:
         Citizen(int id) : Player(id) {
             role = Role::CITIZEN;
@@ -85,66 +104,110 @@ class Citizen : public Player {
             return;
         }
 
-        void vote() override {}
+        SharedPtr<Player> vote(std::vector<SharedPtr<Player>> players) override {
+            SharedPtr<Player> accused = choose_random(players);
+            return accused;
+        }
 };
 
-class Officer : public Player {
+class Officer : public Citizen {
+    private:
+        std::map<int, Role> known;
+        
+        SharedPtr<Player> choose_check(std::vector<SharedPtr<Player>> players) {
+            std::vector<SharedPtr<Player>> unknown;
+            for (SharedPtr<Player> p: players){
+                if ((p->getId() != this -> id) && (known.count(p->getId()) == 0)) {
+                    unknown.push_back(p);
+                } else {
+                    if ((known.count(p->getId()) == 1) && (known[p->getId()] == Role::MAFIA)) return p;
+                }
+            }
+            std::random_device random_device;
+            std::mt19937 engine{random_device()};   
+            std::uniform_int_distribution<int> dist(0, unknown.size() - 1);   
+            return unknown[dist(engine)];
+        }
+
     public:
-        Officer(int id) : Player(id) {
+        Officer(int id) : Citizen(id) {
             role = Role::OFFICER;
         }
 
-        void act(std::vector<SharedPtr<Player>> players) override {}
-        void vote() override {}
+        void act(std::vector<SharedPtr<Player>> players) override {
+            SharedPtr<Player> check = choose_check(players);
+            if (known.count(check->getId()) == 1) {
+                check -> kill();
+            }
+            else {
+                known[check->getId()] = check->getRole();
+            }
+        }
+        
+        SharedPtr<Player> vote(std::vector<SharedPtr<Player>> players) override {
+            std::vector<SharedPtr<Player>> variants;
+            for (SharedPtr<Player> p: players){
+                if ((p->getId() != this -> id) && (known.count(p->getId()) == 1) && (known[p->getId()] == Role::MAFIA)) {
+                    return p;
+                }
+                if ((p->getId() != this -> id) && (known.count(p->getId()) == 0)) {
+                    variants.push_back(p);
+                }
+            }
+            if (variants.size() > 0) return choose_random(variants);
+            else return choose_random(players);
+        }
 };
 
-class Doctor : public Player {
+class Doctor : public Citizen {
+    private:
+        SharedPtr<Player> last_cured;
+
+        SharedPtr<Player> choose_cure(std::vector<SharedPtr<Player>> players) {
+            std::vector<SharedPtr<Player>> possible;
+            for (SharedPtr<Player> p: players){
+                if (p != last_cured) {
+                    possible.push_back(p);
+                }
+            }
+            std::random_device random_device;
+            std::mt19937 engine{random_device()};   
+            std::uniform_int_distribution<int> dist(0, possible.size() - 1);   
+            last_cured = possible[dist(engine)];
+            return last_cured;
+        }
+
     public:
-        Doctor(int id) : Player(id) {
+        Doctor(int id) : Citizen(id) {
             role = Role::DOCTOR;
         }
 
-        void act(std::vector<SharedPtr<Player>> players) override {}
-        void vote() override {}
+        void act(std::vector<SharedPtr<Player>> players) override {
+            SharedPtr<Player> cured = choose_cure(players);
+            cured -> cure();
+        }
+
+        SharedPtr<Player> vote(std::vector<SharedPtr<Player>> players) override {
+            return choose_random(players);
+        }
 };
 
-class Maniac : public Player {
+class Maniac : public Citizen {
     public:
-        Maniac(int id) : Player(id) {
+        Maniac(int id) : Citizen(id) {
             role = Role::MANIAC;
         }
 
-        void act(std::vector<SharedPtr<Player>> players) override {}
-        void vote() override {}
+        void act(std::vector<SharedPtr<Player>> players) override {
+            SharedPtr<Player> victim = choose_random(players);
+            victim -> kill();
+        }
+
+        SharedPtr<Player> vote(std::vector<SharedPtr<Player>> players) override {
+            return choose_random(players);
+        }
 };
 
 int main() {
-    std::vector<SharedPtr<Player>> players;
-    players.push_back(SharedPtr<Player>(new Mafia(1)));
-    
-    // Добавляем граждан (должны быть в списке жертв)
-    players.push_back(SharedPtr<Player>(new Citizen(2)));
-    players.push_back(SharedPtr<Player>(new Citizen(3)));
-    
-    // Добавляем доктора (должен быть в списке жертв)
-    players.push_back(SharedPtr<Player>(new Doctor(4)));
-    
-    // Добавляем офицера (должен быть в списке жертв)
-    players.push_back(SharedPtr<Player>(new Officer(5)));
-    
-    // Добавляем маньяка (должен быть в списке жертв)
-    players.push_back(SharedPtr<Player>(new Maniac(6)));
-    
-    // Добавляем еще одну мафию (не должна быть в списке жертв)
-    players.push_back(SharedPtr<Player>(new Mafia(7)));
-    
-    // Создаем мафию для тестирования
-    Mafia mafia(0);
-    std::cout << "Testing Mafia::choose_victim - should output IDs: 2, 3, 4, 5, 6" << std::endl;
-    std::cout << "Actual output:" << std::endl;
-
-    mafia.act(players);
-
-    std::cout << "Test passed: Mafia correctly identifies non-mafia players as victims" << std::endl;
-    return 0;
+   return 0;
 }
