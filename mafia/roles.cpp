@@ -58,6 +58,7 @@ class Mafia : public Player {
                     victims.push_back(p);
                 }
             }
+            if (victims.empty()) return SharedPtr<Player>();
             std::random_device random_device;
             std::mt19937 engine{random_device()};   
             std::uniform_int_distribution<int> dist(0, victims.size() - 1);   
@@ -71,6 +72,7 @@ class Mafia : public Player {
 
         void act(std::vector<SharedPtr<Player>> players) override {
             SharedPtr<Player> victim = choose_victim(players);
+            if (victim.get() == nullptr) return;
             victim -> kill();
         }
 
@@ -83,12 +85,13 @@ class Mafia : public Player {
 class Citizen : public Player {
     protected:
         SharedPtr<Player> choose_random(std::vector<SharedPtr<Player>> players) {
-             std::vector<SharedPtr<Player>> possible;
+            std::vector<SharedPtr<Player>> possible;
             for (SharedPtr<Player> p: players){
                 if (p->getId() != this->id) {
                     possible.push_back(p);
                 }
             }
+            if (possible.empty()) return SharedPtr<Player>();
             std::random_device random_device;
             std::mt19937 engine{random_device()};   
             std::uniform_int_distribution<int> dist(0, possible.size() - 1);   
@@ -123,6 +126,7 @@ class Officer : public Citizen {
                     if ((known.count(p->getId()) == 1) && (known[p->getId()] == Role::MAFIA)) return p;
                 }
             }
+            if (unknown.empty()) return SharedPtr<Player>();
             std::random_device random_device;
             std::mt19937 engine{random_device()};   
             std::uniform_int_distribution<int> dist(0, unknown.size() - 1);   
@@ -136,6 +140,7 @@ class Officer : public Citizen {
 
         void act(std::vector<SharedPtr<Player>> players) override {
             SharedPtr<Player> check = choose_check(players);
+            if (check.get() == nullptr) return;
             if (known.count(check->getId()) == 1) {
                 check -> kill();
             }
@@ -154,8 +159,8 @@ class Officer : public Citizen {
                     variants.push_back(p);
                 }
             }
-            if (variants.size() > 0) return choose_random(variants);
-            else return choose_random(players);
+            if (variants.empty()) return choose_random(players);
+            else return choose_random(variants);
         }
 };
 
@@ -170,8 +175,9 @@ class Doctor : public Citizen {
                     possible.push_back(p);
                 }
             }
+            if (possible.empty()) return SharedPtr<Player>();
             std::random_device random_device;
-            std::mt19937 engine{random_device()};   
+            std::mt19937 engine{random_device()};
             std::uniform_int_distribution<int> dist(0, possible.size() - 1);   
             last_cured = possible[dist(engine)];
             return last_cured;
@@ -184,6 +190,7 @@ class Doctor : public Citizen {
 
         void act(std::vector<SharedPtr<Player>> players) override {
             SharedPtr<Player> cured = choose_cure(players);
+            if (cured.get() == nullptr) return;
             cured -> cure();
         }
 
@@ -200,6 +207,7 @@ class Maniac : public Citizen {
 
         void act(std::vector<SharedPtr<Player>> players) override {
             SharedPtr<Player> victim = choose_random(players);
+            if (victim.get() == nullptr) return;
             victim -> kill();
         }
 
@@ -208,6 +216,3 @@ class Maniac : public Citizen {
         }
 };
 
-int main() {
-   return 0;
-}
