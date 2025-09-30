@@ -1,4 +1,8 @@
 #include "roles.cpp"
+#include <cmath>
+#include <ios>
+#include <ostream>
+#include <string>
 #include <thread>
 #include <mutex>
 #include <condition_variable>
@@ -7,6 +11,8 @@
 #include <algorithm>
 #include <iostream>
 #include <iomanip>
+#include <filesystem>
+#include <fstream>
 
 class GameMaster {
 private:
@@ -81,11 +87,11 @@ private:
             players.push_back(player);
         }
         
-        log_message("=== РОЛИ РАСПРЕДЕЛЕНЫ ===");
+        log_message("=== РОЛИ РАСПРЕДЕЛЕНЫ ===", true);
         if (full_log) {
             for (auto& player : players) {
                 log_message("Игрок " + std::to_string(player->getId()) + 
-                          ": " + role_to_string(player->getRole()));
+                          ": " + role_to_string(player->getRole()), true);
             }
         }
     }
@@ -101,10 +107,30 @@ private:
         }
     }
 
-    void log_message(const std::string& message) {
-        //std::lock_guard<std::mutex> lock(game_mutex);
-        std::cout << "[" << std::setfill('0') << std::setw(2) << day_count 
+    void log_message(const std::string& message, bool special = false) {
+        std::filesystem::path dir_path = "log";
+        if (!std::filesystem::exists(dir_path)) {
+            std::filesystem::create_directories(dir_path);
+        }
+        std::string file_name;
+        if (special && (day_count < 1)) file_name = "start";
+        else {
+            if (special && (day_count > 1)) file_name = "final";
+            else file_name = (is_day ? "day" + std::to_string(day_count) : "night" + std::to_string(day_count));
+        }
+
+        std::filesystem::path file_path = dir_path/file_name;
+        std::ofstream log_file(file_path, std::ios::app);
+        
+        log_file << "[" << std::setfill('0') << std::setw(2) << day_count 
                   << (is_day ? "-ДЕНЬ" : "-НОЧЬ") << "] " << message << std::endl;
+
+        log_file.close();
+        if (!special) {
+            std::cout << "[" << std::setfill('0') << std::setw(2) << day_count 
+                  << (is_day ? "-ДЕНЬ" : "-НОЧЬ") << "] " << message << std::endl;
+        }
+
     }
 
     std::vector<SharedPtr<Player>> get_alive_players() {
@@ -155,7 +181,6 @@ private:
         
         // Дневное обсуждение (упрощенное)
         log_message("Начинается дневное обсуждение...");
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         
         // Голосование
         voting_phase = true;
@@ -269,10 +294,16 @@ private:
 
     int count_active_night_roles(const std::vector<SharedPtr<Player>>& alive) {
         int count = 0;
+        bool mafia_exists = false;
+    
         for (auto& player : alive) {
             Role role = player->getRole();
-            if (role == Role::MAFIA || role == Role::DOCTOR || 
-                role == Role::OFFICER || role == Role::MANIAC) {
+            if (role == Role::MAFIA) {
+                if (!mafia_exists) {
+                    count++; // Только один представитель мафии действует
+                    mafia_exists = true;
+                }
+            } else if (role == Role::DOCTOR || role == Role::OFFICER || role == Role::MANIAC) {
                 count++;
             }
         }
@@ -311,11 +342,12 @@ private:
     }
 
     void player_thread_function(SharedPtr<Player> player) {
+        bool action_completed = false;
+        bool must_act = true;
         while (game_running) {
             auto alive = get_alive_players();
-            bool action_completed;
 
-            if (!player->isAlive()) {
+            if (!player->isAlive() && !must_act) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             }
@@ -335,33 +367,43 @@ private:
                     }
                 }
                 action_completed = false;
+                must_act = true;
                 game_cv.notify_all();
                 
             } else if (!is_day) {
                 // Ночные действия
                 Role role = player->getRole();
-                if ((role == Role::MAFIA || role == Role::DOCTOR || 
+                if ((role == Role::MAFIA || role == Role::DOCTOR ||
                     role == Role::OFFICER || role == Role::MANIAC) && !action_completed) {
-                    {
-                        action_completed = true;
-                        std::lock_guard<std::mutex> lock(game_mutex);
-                        if (((role == Role::MAFIA) && mafia_acted)) {
-                            actions_completed++;
-                        }
-                        else {
+                    
+
+                    {std::lock_guard<std::mutex> lock(game_mutex);
+                    action_completed = true;
+
+                    // Особенная логика для мафии - только один представитель действует
+                    if (role == Role::MAFIA) {
+                        if (!mafia_acted) {
                             player->act(alive);
+                            mafia_acted = true;
                             actions_completed++;
-                        
                             if (full_log) {
-                                log_message("Игрок " + std::to_string(player->getId()) + 
-                                      " (" + role_to_string(role) + ") совершил ночное действие");
+                                log_message("Мафия совершила ночное действие");
                             }
-                            if (role == Role::MAFIA) mafia_acted = true;
+                        } else actions_completed++;
+                    } else {
+                        // Доктор, комиссар, маньяк действуют всегда
+                        player->act(alive);
+                        actions_completed++;
+                        if (full_log) {
+                            log_message(role_to_string(role) + " совершил ночное действие");
                         }
+                    }
                     }
                     game_cv.notify_all();
                 }
+                must_act = false;
             }
+
             
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
@@ -375,10 +417,10 @@ public:
             throw std::invalid_argument("Минимальное количество игроков: 5");
         }
         
-        log_message("=== ИНИЦИАЛИЗАЦИЯ ИГРЫ ===");
-        log_message("Количество игроков: " + std::to_string(n_players));
-        log_message("Режим объявлений: " + std::string(open_status ? "открытый" : "закрытый"));
-        log_message("Полный лог: " + std::string(full_log ? "включен" : "выключен"));
+        log_message("=== ИНИЦИАЛИЗАЦИЯ ИГРЫ ===", true);
+        log_message("Количество игроков: " + std::to_string(n_players), true);
+        log_message("Режим объявлений: " + std::string(open_status ? "открытый" : "закрытый"), true);
+        log_message("Полный лог: " + std::string(full_log ? "включен" : "выключен"), true);
         
         assign_roles(n_players);
         active_players = n_players;
@@ -394,11 +436,13 @@ public:
         
         // Основной игровой цикл
         while (game_running) {
-            day_phase();
+            if (day_count > 0) {
+                day_phase();
             
-            if (check_game_end()) {
-                break;
-            }
+                if (check_game_end()) {
+                    break;
+                }
+            } else day_count++;
             
             night_phase();
             
@@ -425,21 +469,21 @@ public:
     }
 
     void print_final_statistics() {
-        log_message("=== ФИНАЛЬНАЯ СТАТИСТИКА ===");
-        log_message("Продолжительность игры: " + std::to_string(day_count) + " дней");
+        log_message("=== ФИНАЛЬНАЯ СТАТИСТИКА ===", true);
+        log_message("Продолжительность игры: " + std::to_string(day_count) + " дней", true);
         
         auto alive = get_alive_players();
-        log_message("Выжившие игроки:");
+        log_message("Выжившие игроки:", true);
         for (auto& player : alive) {
             log_message("- Игрок " + std::to_string(player->getId()) + 
-                      " (" + role_to_string(player->getRole()) + ")");
+                      " (" + role_to_string(player->getRole()) + ")", true);
         }
         
-        log_message("Погибшие игроки:");
+        log_message("Погибшие игроки:", true);
         for (auto& player : players) {
             if (!player->isAlive()) {
                 log_message("- Игрок " + std::to_string(player->getId()) + 
-                          " (" + role_to_string(player->getRole()) + ")");
+                          " (" + role_to_string(player->getRole()) + ")", true);
             }
         }
     }

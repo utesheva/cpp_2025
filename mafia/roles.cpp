@@ -2,7 +2,7 @@
 #include <cstdio>
 #include <map>
 #include <vector>
-#include<random>
+#include <random>
 
 enum Role {
     MAFIA,
@@ -22,6 +22,7 @@ class Player {
     public:
 
         Player(int val): id(val) {}
+        virtual ~Player() = default;
 
         virtual void act(std::vector<SharedPtr<Player>> players) = 0;
         virtual SharedPtr<Player> vote(std::vector<SharedPtr<Player>> players) = 0;
@@ -215,4 +216,3 @@ class Maniac : public Citizen {
             return choose_random(players);
         }
 };
-
