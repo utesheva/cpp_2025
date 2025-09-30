@@ -18,6 +18,7 @@ class Player {
         int id;
         int trust = 0;
         bool alive = true;
+        int rating = 0;
 
     public:
 
@@ -35,6 +36,10 @@ class Player {
             return id;
         }
 
+        int getRating() const {
+            return rating;
+        }
+
         bool isAlive() const {
             return alive;
         }
@@ -45,6 +50,10 @@ class Player {
 
         void cure() {
             alive = true;
+        }
+
+        SharedPtr<Player> get_cured() {
+            return SharedPtr<Player>();
         }
 
 };
@@ -79,6 +88,8 @@ class Mafia : public Player {
 
         SharedPtr<Player> vote(std::vector<SharedPtr<Player>> players) override {
             SharedPtr<Player> victim = choose_victim(players);
+            if ((victim -> getRole() == Role::CITIZEN) || (victim -> getRole() == Role::DOCTOR) || (victim -> getRole() == Role::OFFICER)) rating--;
+            else rating++;
             return victim;
         }
 };
@@ -99,6 +110,17 @@ class Citizen : public Player {
             return possible[dist(engine)];
         }
 
+        std::vector<SharedPtr<Player>> get_low_rating(std::vector<SharedPtr<Player>> players) {
+            std::vector<SharedPtr<Player>> low_rating;
+             for (SharedPtr<Player> p: players){
+                if (p->getRating() < 0) {
+                    low_rating.push_back(p);
+                }
+             }
+             if (low_rating.empty()) return players;
+             else return low_rating;
+        }
+
     public:
         Citizen(int id) : Player(id) {
             role = Role::CITIZEN;
@@ -109,7 +131,9 @@ class Citizen : public Player {
         }
 
         SharedPtr<Player> vote(std::vector<SharedPtr<Player>> players) override {
-            SharedPtr<Player> accused = choose_random(players);
+            SharedPtr<Player> accused = choose_random(get_low_rating(players));
+            if ((accused -> getRole() == Role::CITIZEN) || (accused -> getRole() == Role::DOCTOR) || (accused -> getRole() == Role::OFFICER)) rating--;
+            else rating++;
             return accused;
         }
 };
@@ -160,8 +184,13 @@ class Officer : public Citizen {
                     variants.push_back(p);
                 }
             }
-            if (variants.empty()) return choose_random(players);
-            else return choose_random(variants);
+            SharedPtr<Player> accused;
+            if (variants.empty()) accused = choose_random(get_low_rating(players));
+            else accused = choose_random(variants);
+            if ((accused -> getRole() == Role::CITIZEN) || (accused -> getRole() == Role::DOCTOR) || (accused -> getRole() == Role::OFFICER)) rating--;
+            else rating++;
+            return accused;
+
         }
 };
 
@@ -189,6 +218,10 @@ class Doctor : public Citizen {
             role = Role::DOCTOR;
         }
 
+        SharedPtr<Player> get_cured() {
+            return last_cured;
+        }
+
         void act(std::vector<SharedPtr<Player>> players) override {
             SharedPtr<Player> cured = choose_cure(players);
             if (cured.get() == nullptr) return;
@@ -196,7 +229,10 @@ class Doctor : public Citizen {
         }
 
         SharedPtr<Player> vote(std::vector<SharedPtr<Player>> players) override {
-            return choose_random(players);
+            SharedPtr<Player> accused = choose_random(get_low_rating(players));
+            if ((accused -> getRole() == Role::CITIZEN) || (accused -> getRole() == Role::DOCTOR) || (accused -> getRole() == Role::OFFICER)) rating--;
+            else rating++;
+            return accused;
         }
 };
 
@@ -213,6 +249,9 @@ class Maniac : public Citizen {
         }
 
         SharedPtr<Player> vote(std::vector<SharedPtr<Player>> players) override {
-            return choose_random(players);
+            SharedPtr<Player> accused = choose_random(players);
+            if ((accused -> getRole() == Role::CITIZEN) || (accused -> getRole() == Role::DOCTOR) || (accused -> getRole() == Role::OFFICER)) rating--;
+            else rating++;
+            return accused;
         }
 };

@@ -18,6 +18,7 @@ class GameMaster {
 private:
     std::vector<SharedPtr<Player>> players;
     std::vector<std::thread> player_threads;
+    SharedPtr<Player> cured;
     std::mutex game_mutex;
     std::condition_variable game_cv;
     std::atomic<bool> game_running{true};
@@ -327,8 +328,17 @@ private:
                 killed.push_back(player);
             }
         }
-        
-        if (killed.empty()) {
+
+        bool saved = false;
+
+        for (auto& player : killed) {
+            if (player == cured) {
+                player -> cure();
+                saved = true;
+            }
+        }
+
+        if (killed.empty() || (saved && killed.size() == 1)) {
             log_message("Ночь прошла спокойно - никто не пострадал");
         } else {
             log_message("За ночь погибли:");
@@ -397,6 +407,7 @@ private:
                         if (full_log) {
                             log_message(role_to_string(role) + " совершил ночное действие");
                         }
+                        if (role == Role::DOCTOR) cured = player->get_cured();
                     }
                     }
                     game_cv.notify_all();
