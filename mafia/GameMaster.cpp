@@ -20,6 +20,7 @@ private:
     std::vector<std::thread> player_threads;
     SharedPtr<Player> cured;
     std::mutex game_mutex;
+    std::mutex log_mutex;
     std::condition_variable game_cv;
     std::atomic<bool> game_running{true};
     std::atomic<bool> is_day{true};
@@ -108,15 +109,24 @@ private:
         }
     }
 
-    void log_message(const std::string& message, bool special = false) {
+    void start_logs() {
         std::filesystem::path dir_path = "log";
         if (!std::filesystem::exists(dir_path)) {
             std::filesystem::create_directories(dir_path);
         }
+        else {
+            std::filesystem::remove_all(dir_path);
+            std::filesystem::create_directories(dir_path);
+        }
+
+    }
+    void log_message(const std::string& message, bool special = false) {
+        std::lock_guard<std::mutex> lock(log_mutex);
+        std::filesystem::path dir_path = "log";
         std::string file_name;
         if (special && (day_count < 1)) file_name = "start";
         else {
-            if (special && (day_count > 1)) file_name = "final";
+            if (special && (day_count > 1) && is_day) file_name = "final";
             else file_name = (is_day ? "day" + std::to_string(day_count) : "night" + std::to_string(day_count));
         }
 
@@ -274,16 +284,17 @@ private:
     }
 
     void night_phase() {
+        mafia_acted = false;
+        actions_completed = 0;
+        auto alive = get_alive_players();
+
         is_day = false;
         log_message("=== НОЧЬ " + std::to_string(day_count) + " ===");
         
-        auto alive = get_alive_players();
-        actions_completed = 0;
         
         log_message("Город засыпает... Активные роли начинают действовать");
         
         // Ждем завершения ночных действий
-        mafia_acted = false;
         std::unique_lock<std::mutex> lock(game_mutex);
         game_cv.wait(lock, [this, &alive]() {
             return actions_completed.load() >= count_active_night_roles(alive);
@@ -297,7 +308,7 @@ private:
         int count = 0;
         bool mafia_exists = false;
     
-        for (auto& player : alive) {
+        for (auto& player : alive) { 
             Role role = player->getRole();
             if (role == Role::MAFIA) {
                 if (!mafia_exists) {
@@ -387,30 +398,32 @@ private:
                     role == Role::OFFICER || role == Role::MANIAC) && !action_completed) {
                     
 
-                    {std::lock_guard<std::mutex> lock(game_mutex);
+                    {
+                    std::lock_guard<std::mutex> lock(game_mutex);
                     action_completed = true;
 
                     // Особенная логика для мафии - только один представитель действует
                     if (role == Role::MAFIA) {
-                        if (!mafia_acted) {
+                        if (!mafia_acted.load()) {
+                            mafia_acted.store(true);
                             player->act(alive);
-                            mafia_acted = true;
-                            actions_completed++;
                             if (full_log) {
                                 log_message("Мафия совершила ночное действие");
+                                log_message("Убит " + std::to_string(player->acted_with()->getId()), true);
                             }
-                        } else actions_completed++;
+                        }
                     } else {
                         // Доктор, комиссар, маньяк действуют всегда
                         player->act(alive);
-                        actions_completed++;
                         if (full_log) {
                             log_message(role_to_string(role) + " совершил ночное действие");
                         }
-                        if (role == Role::DOCTOR) cured = player->get_cured();
+                        if (role == Role::DOCTOR) cured = player->acted_with();
+                        log_message(role_to_string(role) + " посетил игрока " + std::to_string(player->acted_with()->getId()), true);
                     }
+                    actions_completed++;
                     }
-                    game_cv.notify_all();
+                    game_cv.notify_one();
                 }
                 must_act = false;
             }
@@ -438,6 +451,8 @@ public:
     }
 
     void start_game() {
+        start_logs();
+
         log_message("=== ИГРА НАЧИНАЕТСЯ ===");
         
         // Запускаем потоки для всех игроков

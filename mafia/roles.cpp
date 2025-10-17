@@ -27,6 +27,7 @@ class Player {
 
         virtual void act(std::vector<SharedPtr<Player>> players) = 0;
         virtual SharedPtr<Player> vote(std::vector<SharedPtr<Player>> players) = 0;
+        virtual SharedPtr<Player> acted_with() = 0;
 
         Role getRole() const {
             return role;
@@ -52,15 +53,12 @@ class Player {
             alive = true;
         }
 
-        SharedPtr<Player> get_cured() {
-            return SharedPtr<Player>();
-        }
-
-};
+       };
 
 
 class Mafia : public Player {
     private:
+        SharedPtr<Player> killed;
         SharedPtr<Player> choose_victim(std::vector<SharedPtr<Player>> players) {
             std::vector<SharedPtr<Player>> victims;
             for (SharedPtr<Player> p: players){
@@ -82,8 +80,12 @@ class Mafia : public Player {
 
         void act(std::vector<SharedPtr<Player>> players) override {
             SharedPtr<Player> victim = choose_victim(players);
-            if (victim.get() == nullptr) return;
+            if (victim.get() == nullptr) {
+                killed = SharedPtr<Player>();
+                return;
+            }
             victim -> kill();
+            killed = victim;
         }
 
         SharedPtr<Player> vote(std::vector<SharedPtr<Player>> players) override {
@@ -92,6 +94,11 @@ class Mafia : public Player {
             else rating++;
             return victim;
         }
+        
+        SharedPtr<Player> acted_with() override{
+            return killed;
+        }
+
 };
 
 class Citizen : public Player {
@@ -136,12 +143,17 @@ class Citizen : public Player {
             else rating++;
             return accused;
         }
+
+        SharedPtr<Player> acted_with() override{
+            return SharedPtr<Player>();
+        }
+
 };
 
 class Officer : public Citizen {
     private:
         std::map<int, Role> known;
-        
+        SharedPtr<Player> last_checked;
         SharedPtr<Player> choose_check(std::vector<SharedPtr<Player>> players) {
             std::vector<SharedPtr<Player>> unknown;
             for (SharedPtr<Player> p: players){
@@ -165,13 +177,17 @@ class Officer : public Citizen {
 
         void act(std::vector<SharedPtr<Player>> players) override {
             SharedPtr<Player> check = choose_check(players);
-            if (check.get() == nullptr) return;
+            if (check.get() == nullptr) {
+                last_checked = SharedPtr<Player>();
+                return;
+            }
             if (known.count(check->getId()) == 1) {
                 check -> kill();
             }
             else {
                 known[check->getId()] = check->getRole();
             }
+            last_checked = check;
         }
         
         SharedPtr<Player> vote(std::vector<SharedPtr<Player>> players) override {
@@ -191,6 +207,10 @@ class Officer : public Citizen {
             else rating++;
             return accused;
 
+        }
+
+        SharedPtr<Player> acted_with() override{
+            return last_checked;
         }
 };
 
@@ -218,13 +238,16 @@ class Doctor : public Citizen {
             role = Role::DOCTOR;
         }
 
-        SharedPtr<Player> get_cured() {
+        SharedPtr<Player> acted_with() override{
             return last_cured;
         }
 
         void act(std::vector<SharedPtr<Player>> players) override {
             SharedPtr<Player> cured = choose_cure(players);
-            if (cured.get() == nullptr) return;
+            if (cured.get() == nullptr) {
+                last_cured = SharedPtr<Player>();
+                return;
+            }
             cured -> cure();
         }
 
@@ -237,6 +260,8 @@ class Doctor : public Citizen {
 };
 
 class Maniac : public Citizen {
+    private:
+        SharedPtr<Player> killed;
     public:
         Maniac(int id) : Citizen(id) {
             role = Role::MANIAC;
@@ -244,8 +269,12 @@ class Maniac : public Citizen {
 
         void act(std::vector<SharedPtr<Player>> players) override {
             SharedPtr<Player> victim = choose_random(players);
-            if (victim.get() == nullptr) return;
+            if (victim.get() == nullptr) {
+                killed = SharedPtr<Player>();
+                return;
+            }
             victim -> kill();
+            killed = victim;
         }
 
         SharedPtr<Player> vote(std::vector<SharedPtr<Player>> players) override {
@@ -253,5 +282,9 @@ class Maniac : public Citizen {
             if ((accused -> getRole() == Role::CITIZEN) || (accused -> getRole() == Role::DOCTOR) || (accused -> getRole() == Role::OFFICER)) rating--;
             else rating++;
             return accused;
+        }
+
+        SharedPtr<Player> acted_with() override{
+            return killed;
         }
 };

@@ -66,12 +66,12 @@ class SharedPtr {
             if (ptr != other.ptr) return true;
             else return false;
         };
-
+/*
         bool operator<(const SharedPtr& other) const {
             if (ptr < other.ptr) return true;
             else return false;
         };
-
+*/
 
         int getCount(){
             return *ref_count;
