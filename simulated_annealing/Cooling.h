@@ -4,6 +4,7 @@
 class TemperatureLaw {
 public:
     virtual double get_next_temperature(int iter) const = 0;
+    virtual ~TemperatureLaw() = default;
 };
 
 class BoltzmannLaw : public TemperatureLaw {
@@ -12,16 +13,17 @@ private:
 public:
     BoltzmannLaw(double temp) : initial_temp(temp) {}
     double get_next_temperature(int iter) const override {
-        return initial_temp / std::log(1 + iter);
+        return initial_temp / std::log(1 + iter + 1);
     }
 };
 
 class CauchyLaw : public TemperatureLaw {
-    private:
+private:
     double initial_temp;
 public:
     CauchyLaw(double temp): initial_temp(temp) {}
     double get_next_temperature(int iter) const override {
+        if (iter <= 0) return initial_temp;
         return initial_temp / (1 + iter);
     }
 };
@@ -30,7 +32,9 @@ class LogarithmicCauchyLaw : public TemperatureLaw {
 private:
     double initial_temp;
 public:
+    LogarithmicCauchyLaw(double temp): initial_temp(temp) {}
     double get_next_temperature(int iter) const override {
+        if (iter <= 0) return initial_temp;
         return initial_temp * (std::log(1 + iter) / (1 + iter));
     }
 };
