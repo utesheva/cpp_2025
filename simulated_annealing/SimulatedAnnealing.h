@@ -48,7 +48,7 @@ public:
                 if (acceptanceProbability >= static_cast<double>(rand()) / RAND_MAX) {
                     iter_no_impr = 0;
                     best_solution = new_solution;
-                } 
+                }
                 else {
                     iter_no_impr++;
                 }

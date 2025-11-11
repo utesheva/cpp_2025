@@ -119,7 +119,6 @@ private:
             best_solution = solution->clone();
             temperature = initial_temp;
 
-            // ИСПРАВЛЕНИЕ: Ограничиваем общее количество итераций
             while (iter_no_impr < max_iterations && iter < max_iterations * 2) {
                 auto new_solution = best_solution->clone();
                 mutation->apply(*new_solution);
@@ -154,17 +153,12 @@ private:
 
 // Исследование масштабируемости параллельного алгоритма
 void parallel_scaling_study() {
-    const int num_jobs = 500;
-    const int num_processors = 32;
-    const int num_runs = 3;
+    const int num_jobs = 12800;
+    const int num_processors = 20;
+    const int num_runs = 2;
     
     // Генерация тестовых данных
-    std::vector<uint8_t> job_times(num_jobs);
-    std::mt19937 gen(42);
-    std::uniform_int_distribution<> distrib(1, 100);
-    for (int i = 0; i < num_jobs; ++i) {
-        job_times[i] = distrib(gen);
-    }
+    std::vector<uint8_t> job_times = load_jobs("jobs.csv");
     
     std::vector<int> thread_counts = {1, 2, 4, 8};
     ParallelResearch research;
