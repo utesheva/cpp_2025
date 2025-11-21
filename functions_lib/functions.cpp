@@ -1,11 +1,13 @@
 #include "functions.h"
 #include <memory>
+#include <ostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
 #include <cmath>
 
-TFunctionPtr FuncFactory::Create(const std::string& type, const std::vector<double>& params) {
+TFunctionPtr FuncFactory::Create(const std::string& type, const std::vector<double>& params = {}) {
     if (type == "ident") return std::make_shared<IdentityFunction>();
     if ((type == "const") && (params.size() == 1)) return std::make_shared<RealFunction>(params[0]);;
     if ((type == "const") && (params.size() != 1)) throw std::invalid_argument("Invalid number of parameters (need 1)");
@@ -54,7 +56,9 @@ double PowerFunction::GetDerivative(double x) const {
 }
 
 std::string PowerFunction::ToString() const {
-    return "x^" + std::to_string(power);
+    std::ostringstream os;
+    os << "x^" << power;
+    return os.str();
 }
 
 double Exponent::operator()(double x) const{
@@ -88,9 +92,10 @@ double Polynom::GetDerivative(double x) const {
 }
 
 std::string Polynom::ToString() const {
-    std::string res = std::to_string(params[0]);
+    std::ostringstream os;
+    if (params[0] != 0) os << params[0];
     for (int i=1; i < params.size(); ++i) {
-        res += " + " + std::to_string(params[i]) + "x^" + std::to_string(i);
+        if (params[i] != 0) os << " + " << params[i] << "x^" << i;
     }
-    return res;
+    return os.str();
 }
