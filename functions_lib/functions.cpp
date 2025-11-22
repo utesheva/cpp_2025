@@ -7,7 +7,7 @@
 #include <vector>
 #include <cmath>
 
-TFunctionPtr FuncFactory::Create(const std::string& type, const std::vector<double>& params = {}) {
+TFunctionPtr FuncFactory::Create(const std::string& type, const std::vector<double>& params) {
     if (type == "ident") return std::make_shared<IdentityFunction>();
     if ((type == "const") && (params.size() == 1)) return std::make_shared<RealFunction>(params[0]);;
     if ((type == "const") && (params.size() != 1)) throw std::invalid_argument("Invalid number of parameters (need 1)");
@@ -42,7 +42,9 @@ double RealFunction::GetDerivative(double x) const {
 }
 
 std::string RealFunction::ToString() const {
-    return std::to_string(constant);
+    std::ostringstream os;
+    os << constant;
+    return os.str();
 }
 
 PowerFunction::PowerFunction(double x): power(x) {}
@@ -92,10 +94,26 @@ double Polynom::GetDerivative(double x) const {
 }
 
 std::string Polynom::ToString() const {
+    if (params.empty()) return "0";
     std::ostringstream os;
     if (params[0] != 0) os << params[0];
     for (int i=1; i < params.size(); ++i) {
         if (params[i] != 0) os << " + " << params[i] << "x^" << i;
     }
     return os.str();
+}
+
+Combination::Combination(Func function, Func derivative, const std::string& string_format):
+    derivative(derivative), function(function), string_format(string_format) {}
+
+double Combination::operator()(double x) const{
+    return function(x);
+}
+
+double Combination::GetDerivative(double x) const {
+    return derivative(x);
+}
+
+std::string Combination::ToString() const {
+    return string_format;
 }

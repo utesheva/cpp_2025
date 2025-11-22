@@ -8,6 +8,7 @@
 
 class TFunction {
 public:
+    virtual ~TFunction() = default;
     virtual double operator()(double x) const = 0;
     virtual double GetDerivative(double x) const = 0;
     virtual std::string ToString() const = 0;
@@ -17,7 +18,7 @@ using TFunctionPtr = std::shared_ptr<TFunction>;
 
 class FuncFactory {
 public:
-    TFunctionPtr Create(const std::string& type, const std::vector<double>& params);
+    TFunctionPtr Create(const std::string& type, const std::vector<double>& params = {});
 };
 
 class IdentityFunction: public TFunction {
@@ -59,6 +60,20 @@ private:
     std::vector<double> params;
 public:
     explicit Polynom(const std::vector<double>& params);
+    double operator()(double x) const override;
+    double GetDerivative(double x) const override;
+    std::string ToString() const override;
+};
+
+using Func = std::function<double(double)>;
+
+class Combination: public TFunction {
+private:
+    Func derivative;
+    Func function;
+    std::string string_format;
+public:
+    Combination(Func function, Func derivative, const std::string& string_format);
     double operator()(double x) const override;
     double GetDerivative(double x) const override;
     std::string ToString() const override;
