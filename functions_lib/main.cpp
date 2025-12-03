@@ -1,18 +1,16 @@
 #include "functions.h"
 #include "operators.h"
 #include <iostream>
+#include "gradient.h"
 
 int main() {
-std::vector<TFunctionPtr> cont = {};
-auto f = FuncFactory().Create("power", {2}); // PowerFunc x^2
-cont.push_back(f);
-auto g = FuncFactory().Create("polynomial", {7, 0, 3, 15}); // TPolynomial 7 + 3*x^2 + 15*x^3
-cont.push_back(g);
-for (const auto ptr : cont) {
-std::cout << ptr->ToString() << " for x = 10 is " << (*ptr)(10) << std::endl;
-}
-auto p = *f + *g;
-std::cout << p->GetDerivative(1) << std::endl; // 53
-auto h = *f + "abc"; // std::logic_error
-std::cout << f->GetDerivative(3) << std::endl; // 429
+FuncFactory factory;
+
+TFunctionPtr p1 = factory.Create("polynomial", {2, 1});
+TFunctionPtr p2 = factory.Create("polynomial", {-3, 1});
+TFunctionPtr p = p1 * p2;
+// double GradientDesc(const TFunction& func, double initial, double learning_rate, int max_iter)
+std::cout << p->ToString() << std::endl;
+std::cout << GradientDesc(*p, 12, 0.01, 1000) << std::endl;
+return 0;
 }

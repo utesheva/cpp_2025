@@ -205,9 +205,6 @@ TEST(ToStringTest, BasicFunctions) {
     EXPECT_EQ(prod->ToString(), "(x * e^x)");
 }
 
-// Добавьте в tests.cpp
-
-#include "gradient.h"
 
 // Test Gradient Descent
 class GradientDescentTest : public ::testing::Test {
